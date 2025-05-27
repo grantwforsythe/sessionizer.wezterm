@@ -6,7 +6,12 @@ A tmux like sessionizer for Wezterm that was inspired by [ThePrimeagen's tmux-se
 
 The sessionizer allows for opening of windows/sessions based on the passed in
 directories, as well as fast and intuative switching between active
-workspaces/sessions
+workspaces/sessions.
+
+This fork uses [zoxide](https://github.com/ajeetdsouza/zoxide) as it works on all major operation systems and has better performance over built in commands.
+
+## Requirements
+- [zoxide](https://github.com/ajeetdsouza/zoxide) is used to "jump" between workspaces
 
 ## Setup
 
@@ -14,7 +19,6 @@ An example configuration calling the plugin
 
 ```lua
 local wezterm = require "wezterm"
-local sessionizer = wezterm.plugin.require("https://github.com/ElCapitanSponge/sessionizer.wezterm")
 
 local config = {}
 
@@ -31,40 +35,22 @@ config.leader = {
 
 config.keys = {}
 
--- INFO: The following is the project directories to search
-local projects = {
-    "~/personal",
-    "~/work"
-}
-
-sessionizer.set_projects(projects)
-sessionizer.configure(config)
+local sessionizer = wezterm.plugin.require("https://github.com/grantwforsythe/sessionizer.wezterm")
+sessionizer.apply_to_config(config)
 
 return config
 ```
 
 ## USEAGE
 
-To use the sessionizer you have to define and pass through a table of project
-folders, that are the paths to your applicable repositores to leverage for the
-workspaces.
+The sessionizer uses directories being tracked by zoxide. Read the offical documentation for more details on tracking directories.
 
-```lua
-local projects = {
-    "~/personal",
-    "~/work"
-}
-```
+| Key Combination   | Default | Description                                 |
+|-------------------|---------|---------------------------------------------|
+| `LEADER` + `f`    | Yes     | Display the sessionizer                     |
+| `LEADER` + `s`    | Yes     | Display the active windows/sessions         |
 
-To display the sessionizer all you have to do is press the key combination of
-`LEADER` + `f`
-
-To display the active windows/sessions all you have to do is press the key
-combination of `LEADER` + `s`
-
-## Change keybinding
-
-To change the keybinding from the default (`LEADER` + `f`):
+### Change keybinding
 
 ```lua
 config.keys = {
