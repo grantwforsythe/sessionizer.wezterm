@@ -1,4 +1,4 @@
-local sessionizer = require("sessionizer")
+local sessionizer = require("sessionizer.core")
 
 local M = {}
 

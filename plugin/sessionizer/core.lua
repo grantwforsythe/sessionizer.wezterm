@@ -2,7 +2,7 @@ local wezterm = require("wezterm")
 local act = wezterm.action
 local mux = wezterm.mux
 
-local utils = require("utils")
+local helpers = require("sessionizer.helpers")
 
 ---@class SessionizerConfig
 ---@field paths string[]
@@ -16,10 +16,10 @@ local config = {
 --- Returns the file descriptor path as a string.
 --- @return string fd_path The file descriptor path.
 local function get_fd_path()
-	local args = utils.is_windows and "dir /s /b %USERPROFILE%\\AppData\\Local\\Microsoft\\WinGet\\Packages\\fd.exe"
+	local args = helpers.is_windows and "dir /s /b %USERPROFILE%\\AppData\\Local\\Microsoft\\WinGet\\Packages\\fd.exe"
 		or "which fd"
 
-	local stdout = utils.run_child_process(args)
+	local stdout = helpers.run_child_process(args)
 	-- On Windows, the output may contain a newline character at the end
 	local fd_path = string.gsub(stdout, "[\r\n]", "")
 
@@ -36,12 +36,12 @@ local function get_directories(paths)
 	--- @type InputSelector[]
 	local folders = {}
 
-	local stdout = utils.run_child_process(
+	local stdout = helpers.run_child_process(
 		config.fd_path or get_fd_path() .. " . -a --type d --max-depth 1 " .. table.concat(config.paths, " ")
 	)
 
 	for _, path in ipairs(wezterm.split_by_newlines(stdout)) do
-		table.insert(folders, { id = path, label = utils.get_short_path(path) })
+		table.insert(folders, { id = path, label = helpers.get_short_path(path) })
 	end
 
 	return folders
@@ -59,7 +59,7 @@ local function get_active_workspaces()
 		end
 
 		table.insert(workspaces, {
-			id = utils.get_full_path(workspace),
+			id = helpers.get_full_path(workspace),
 			label = wezterm.format({
 				{ Foreground = { Color = "#fabd2f" } },
 				{ Text = wezterm.nerdfonts.cod_window .. " " .. workspace },

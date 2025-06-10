@@ -2,7 +2,7 @@ local wezterm = require("wezterm")
 
 ---@alias Set table<string, boolean>
 
----@class Utils
+---@class Helpers
 ---@field is_windows boolean
 ---@field run_child_process fun(cmd: string): string
 ---@field get_full_path fun(workspace: string): string
