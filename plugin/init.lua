@@ -1,3 +1,6 @@
+-- NOTE: This is required to ensure that the plugin can be loaded correctly
+package.path = package.path .. ";" .. ({ ... })[2]:gsub("init.lua$", "?.lua")
+
 local sessionizer = require("sessionizer.core")
 
 local M = {}
