@@ -11,6 +11,7 @@ local helpers = require("sessionizer.helpers")
 local config = {
 	paths = { wezterm.home_dir },
 	ignore_default_workspace = true,
+	add_workspace_to_zoxide = false,
 }
 
 --- Returns the file descriptor path as a string.
@@ -26,50 +27,57 @@ local function get_fd_path()
 	return fd_path
 end
 
+---Get a list of active workspaces.
+---@return InputSelector[]
+local function get_active_workspaces_to_set()
+	local set = {}
+
+	for _, workspace in ipairs(mux.get_workspace_names()) do
+		if not (config.ignore_default_workspace and workspace == "default") then
+			set[helpers.get_full_path(workspace)] = true
+		end
+	end
+
+	return set
+end
+
 ---@class InputSelector
 ---@field id string
 ---@field label string
 
 ---Retrieve the directories found within the base_path table
 ---@return InputSelector[]
-local function get_directories(paths)
+local function get_workspaces()
+	local active_workspaces_set = get_active_workspaces_to_set()
+	local paths = helpers.map(config.paths, function(v)
+		local transformed_path = string.gsub(v, "~", wezterm.home_dir)
+		return transformed_path
+	end)
+
 	--- @type InputSelector[]
 	local folders = {}
 
 	local stdout = helpers.run_child_process(
-		config.fd_path or get_fd_path() .. " . -a --type d --max-depth 1 " .. table.concat(config.paths, " ")
+		config.fd_path or get_fd_path() .. " . -a --type d --max-depth 1 " .. table.concat(paths, " ")
 	)
 
 	for _, path in ipairs(wezterm.split_by_newlines(stdout)) do
-		table.insert(folders, { id = path, label = helpers.get_short_path(path) })
+		if not active_workspaces_set[path] then
+			table.insert(folders, { id = path, label = helpers.get_short_path(path) })
+		else
+			table.insert(folders, {
+				id = path,
+				label = wezterm.format({
+					{ Foreground = { Color = "#fabd2f" } },
+					--{ Text = wezterm.nerdfonts.cod_window .. " " .. workspace },
+					{ Text = helpers.get_short_path(path) },
+					{ Attribute = { Intensity = "Bold" } },
+				}),
+			})
+		end
 	end
 
 	return folders
-end
-
----Get a list of active workspaces.
----@return InputSelector[]
-local function get_active_workspaces()
-	--- @type InputSelector[]
-	local workspaces = {}
-
-	for _, workspace in ipairs(mux.get_workspace_names()) do
-		if config.ignore_default_workspace and workspace == "default" then
-			goto continue
-		end
-
-		table.insert(workspaces, {
-			id = helpers.get_full_path(workspace),
-			label = wezterm.format({
-				{ Foreground = { Color = "#fabd2f" } },
-				{ Text = wezterm.nerdfonts.cod_window .. " " .. workspace },
-				{ Attribute = { Intensity = "Bold" } },
-			}),
-		})
-		::continue::
-	end
-
-	return workspaces
 end
 
 ---@class Sessionizer
@@ -80,55 +88,42 @@ local M = {}
 
 M.workspace_switcher = function()
 	return wezterm.action_callback(function(window, pane)
-		local active_workspaces = get_active_workspaces()
-		local inactive_workspaces = get_directories()
-
-		-- Build a set of active workspace ids for quick lookup
-		local active_ids = {}
-		-- Populate the active_ids set with the ids of currently active workspaces
-		for _, ws in ipairs(active_workspaces) do
-			active_ids[ws.id] = true
-		end
-
-		-- Only add workspaces that are not already active
-		for _, ws in ipairs(inactive_workspaces) do
-			if not active_ids[ws.id] then
-				table.insert(active_workspaces, ws)
-			end
-		end
+		local workspaces = get_workspaces()
 
 		window:perform_action(
 			act.InputSelector({
 				action = wezterm.action_callback(function(inner_window, inner_pane, id, label)
 					if not id and not label then
-						-- INFO: Do nothing
-					else
-						local full_path = string.gsub(label, "^~", wezterm.home_dir)
-						wezterm.log_info("Switching to workspace: " .. full_path)
+						return
+					end
 
-						if full_path:sub(1, 1) == "/" or full_path:sub(3, 3) == "\\" then
-							inner_window:perform_action(
-								act.SwitchToWorkspace({
-									name = label,
-									spawn = {
-										label = "Workspace: " .. label,
-										cwd = full_path,
-									},
-								}),
-								inner_pane
-							)
-						else
-							inner_window:perform_action(
-								act.SwitchToWorkspace({
-									name = id,
-								}),
-								inner_pane
-							)
-						end
+					if id:sub(1, 1) == "/" or id:sub(3, 3) == "\\" then
+						inner_window:perform_action(
+							act.SwitchToWorkspace({
+								name = label,
+								spawn = {
+									label = "Workspace: " .. label,
+									cwd = id,
+								},
+							}),
+							inner_pane
+						)
+					else
+						inner_window:perform_action(
+							act.SwitchToWorkspace({
+								name = id,
+							}),
+							inner_pane
+						)
+					end
+
+					if config.add_workspace_to_zoxide then
+						wezterm.log_info("Adding workspace to zoxide: " .. id)
+						helpers.run_child_process("zoxide add " .. id)
 					end
 				end),
 				title = "Wezterm Sessionizer",
-				choices = active_workspaces,
+				choices = workspaces,
 				fuzzy = true,
 			}),
 			pane
@@ -141,18 +136,12 @@ M.active_workspaces = function()
 end
 
 M.setup = function(opts)
-	local transformed_paths = {}
-	for _, v in ipairs(opts.paths) do
-		local transformed_path = string.gsub(v, "~", wezterm.home_dir)
-		table.insert(transformed_paths, transformed_path)
-	end
-
-	if #transformed_paths > 0 then
-		config.paths = transformed_paths
-	end
-
-	if opts.fd_path ~= nil then
-		config.fd_path = opts.fd_path
+	for key, value in pairs(opts) do
+		if config[key] ~= nil then
+			config[key] = value
+		else
+			wezterm.log_warn("Unknown option: " .. key)
+		end
 	end
 end
 

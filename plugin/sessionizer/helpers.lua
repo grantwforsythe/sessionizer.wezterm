@@ -34,6 +34,14 @@ M.get_short_path = function(path)
 	return short_path
 end
 
+M.map = function(tbl, func)
+	local new_tbl = {}
+	for i, value in ipairs(tbl) do
+		new_tbl[i] = func(value)
+	end
+	return new_tbl
+end
+
 M.new_set = function(list)
 	local set = {}
 	for _, v in ipairs(list) do
